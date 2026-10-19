@@ -212,6 +212,12 @@ class WaveformWidgetFactory : public QObject,
     bool getMemoryCueNameCustomTextColor() const;
     void setMemoryCueNameTextColor(const QColor& color);
     QColor getMemoryCueNameTextColor() const;
+    void setHotCueLetters(bool letters);
+    bool getHotCueLetters() const;
+    void setHotCueLabelPlacement(WaveformMark::HotCueLabelPlacement placement);
+    WaveformMark::HotCueLabelPlacement getHotCueLabelPlacement() const;
+    void setHotCueLabelStyle(WaveformMark::HotCueLabelStyle style);
+    WaveformMark::HotCueLabelStyle getHotCueLabelStyle() const;
     void setUntilMarkShowTime(bool value);
     void setUntilMarkAlign(Qt::Alignment align);
     void setUntilMarkTextPointSize(int value);

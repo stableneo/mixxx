@@ -319,6 +319,44 @@ class WaveformMark {
     // isMemoryCueMarker() and enabled for that view.
     bool isMemoryCueMarkerInScrollingWaveforms() const;
     bool isMemoryCueMarkerInOverview() const;
+    // Rekordbox-style hotcue names: A, B, C... instead of 1, 2, 3.
+    static void setHotCueLetters(bool letters);
+    static bool hotCueLetters();
+    // Vertical placement of hotcue labels: as defined by the skin, or forced
+    // to the top or bottom of the waveforms.
+    enum class HotCueLabelPlacement {
+        SkinDefault = 0,
+        Top = 1,
+        Bottom = 2,
+    };
+    static void setHotCueLabelPlacement(HotCueLabelPlacement placement);
+    static HotCueLabelPlacement hotCueLabelPlacement();
+    // Look of hotcue labels. Rekordbox: centered on the cue line (at the top
+    // unless placed at the bottom), cue colored background, black text, no
+    // outline.
+    enum class HotCueLabelStyle {
+        Mixxx = 0,
+        Rekordbox = 1,
+    };
+    static void setHotCueLabelStyle(HotCueLabelStyle style);
+    static HotCueLabelStyle hotCueLabelStyle();
+    // Whether this mark is a hotcue drawn in the rekordbox label style.
+    bool isRekordboxStyleLabel() const;
+    // Display name of a hotcue (0-based index): "1", "2", ... or "A", "B", ...
+    // Hotcues beyond Z keep their number.
+    static QString hotCueName(int hotCue);
+    // Alignment of this mark's label, taking the hotcue label placement into account.
+    Qt::Alignment labelAlign() const;
+    // Whether this is the main cue marker (cue_point).
+    bool isMainCue() const;
+    // Text to show for this mark. Skins often label the main cue with a single
+    // letter ("C"), which would clash with hotcue C when hotcue letters are
+    // enabled, so it is shown as "CUE" then.
+    QString displayText() const;
+    // Changes whenever a global marker style setting changes.
+    static int styleGeneration() {
+        return s_styleGeneration.load();
+    }
 
     QColor m_textColor;
     QString m_text;
@@ -414,6 +452,11 @@ class WaveformMark {
     int m_styleGeneration{-1};
 
     QImage generateMemoryCueImage(float devicePixelRatio);
+
+    // Hotcue label options (letters, placement, style)
+    static std::atomic<bool> s_hotCueLetters;
+    static std::atomic<int> s_hotCueLabelPlacement;
+    static std::atomic<int> s_hotCueLabelStyle;
 
     friend class WaveformRenderMark;
     friend class WaveformRenderMarkBase;

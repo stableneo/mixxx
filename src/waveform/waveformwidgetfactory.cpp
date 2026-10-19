@@ -553,6 +553,27 @@ bool WaveformWidgetFactory::setConfig(UserSettingsPointer config) {
     setMemoryCueNameTextColor(QColor(m_config->getValue(
             ConfigKey(kWaveformGroup, QStringLiteral("MemoryCueNameTextColor")),
             QStringLiteral("#ffffff"))));
+    setHotCueLetters(m_config->getValue(
+            ConfigKey(kWaveformGroup, QStringLiteral("HotCueLetters")), false));
+    // 0 = Mixxx, 1 = rekordbox
+    setHotCueLabelStyle(
+            m_config->getValue(
+                    ConfigKey(kWaveformGroup, QStringLiteral("HotCueLabelStyle")), 0) == 1
+                    ? WaveformMark::HotCueLabelStyle::Rekordbox
+                    : WaveformMark::HotCueLabelStyle::Mixxx);
+    // 0 = skin default, 1 = top, 2 = bottom
+    switch (m_config->getValue(
+            ConfigKey(kWaveformGroup, QStringLiteral("HotCueLabelPlacement")), 0)) {
+    case 1:
+        setHotCueLabelPlacement(WaveformMark::HotCueLabelPlacement::Top);
+        break;
+    case 2:
+        setHotCueLabelPlacement(WaveformMark::HotCueLabelPlacement::Bottom);
+        break;
+    default:
+        setHotCueLabelPlacement(WaveformMark::HotCueLabelPlacement::SkinDefault);
+        break;
+    }
 
     setUntilMarkAlign(toUntilMarkAlign(
             m_config->getValue(ConfigKey(kWaveformGroup, QStringLiteral("UntilMarkAlign")),
@@ -1916,6 +1937,42 @@ void WaveformWidgetFactory::setMemoryCueNameTextColor(const QColor& color) {
 
 QColor WaveformWidgetFactory::getMemoryCueNameTextColor() const {
     return WaveformMark::memoryCueNameTextColor();
+}
+
+void WaveformWidgetFactory::setHotCueLetters(bool letters) {
+    WaveformMark::setHotCueLetters(letters);
+    if (m_config) {
+        m_config->setValue(ConfigKey(kWaveformGroup, QStringLiteral("HotCueLetters")), letters);
+    }
+}
+
+bool WaveformWidgetFactory::getHotCueLetters() const {
+    return WaveformMark::hotCueLetters();
+}
+
+void WaveformWidgetFactory::setHotCueLabelPlacement(
+        WaveformMark::HotCueLabelPlacement placement) {
+    WaveformMark::setHotCueLabelPlacement(placement);
+    if (m_config) {
+        m_config->setValue(ConfigKey(kWaveformGroup, QStringLiteral("HotCueLabelPlacement")),
+                static_cast<int>(getHotCueLabelPlacement()));
+    }
+}
+
+WaveformMark::HotCueLabelPlacement WaveformWidgetFactory::getHotCueLabelPlacement() const {
+    return WaveformMark::hotCueLabelPlacement();
+}
+
+void WaveformWidgetFactory::setHotCueLabelStyle(WaveformMark::HotCueLabelStyle style) {
+    WaveformMark::setHotCueLabelStyle(style);
+    if (m_config) {
+        m_config->setValue(ConfigKey(kWaveformGroup, QStringLiteral("HotCueLabelStyle")),
+                static_cast<int>(getHotCueLabelStyle()));
+    }
+}
+
+WaveformMark::HotCueLabelStyle WaveformWidgetFactory::getHotCueLabelStyle() const {
+    return WaveformMark::hotCueLabelStyle();
 }
 
 void WaveformWidgetFactory::setUntilMarkShowTime(bool value) {

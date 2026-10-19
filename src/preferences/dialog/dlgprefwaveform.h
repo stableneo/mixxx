@@ -71,6 +71,9 @@ class DlgPrefWaveform : public DlgPreferencePage, public Ui::DlgPrefWaveformDlg 
     void slotSetMemoryCueNameCustomTextColor(bool checked);
     void slotChooseMemoryCueNameTextColor();
     void slotSetUntilMarkShowBeats(bool checked);
+    void slotSetHotCueLetters(bool checked);
+    void slotSetHotCueLabelPlacement(int index);
+    void slotSetHotCueLabelStyle(int index);
     void slotSetUntilMarkShowTime(bool checked);
     void slotSetUntilMarkAlign(int index);
     void slotSetUntilMarkTextPointSize(int value);

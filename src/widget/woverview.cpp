@@ -34,10 +34,11 @@ namespace {
 constexpr int kDragOutsideLimitX = 100;
 constexpr int kDragOutsideLimitY = 50;
 
-// Hotcue labels in the overview are "<number>: <label>" (see updateCues()).
-// Returns just the label part, or an empty string if the cue has no label.
+// Hotcue labels in the overview are "<number or letter>: <label>" (see
+// updateCues()). Returns just the label part, or an empty string if the cue
+// has no label.
 QString cueNameFromOverviewLabel(const QString& text, int hotCue) {
-    const QString number = QString::number(hotCue + 1);
+    const QString number = WaveformMark::hotCueName(hotCue);
     if (text == number) {
         return {};
     }
@@ -53,8 +54,8 @@ bool hasOverviewLabelAt(const WaveformMarkPointer& pMark, Qt::Alignment valign) 
                 valign == (WaveformMark::memoryCueNameAlign() & Qt::AlignVertical_Mask) &&
                 !cueNameFromOverviewLabel(pMark->m_text, pMark->getHotCue()).isEmpty();
     }
-    // Hotcues always show at least their number.
-    return valign == (pMark->m_align & Qt::AlignVertical_Mask) &&
+    // Hotcues always show at least their number (or letter).
+    return valign == (pMark->labelAlign() & Qt::AlignVertical_Mask) &&
             (!pMark->m_text.isEmpty() || pMark->getHotCue() != Cue::kNoHotCue);
 }
 } // anonymous namespace
@@ -548,12 +549,13 @@ void WOverview::updateCues(const QList<CuePointer> &loadedCues) {
                         currentCue->getType() == mixxx::CueType::Loop ||
                         currentCue->getType() == mixxx::CueType::Jump) &&
                     hotcueNumber != Cue::kNoHotCue) {
-                // Prepend the hotcue number to hotcues' labels
+                // Prepend the hotcue number (or letter) to hotcues' labels
+                const QString hotcueName = WaveformMark::hotCueName(hotcueNumber);
                 QString newLabel = currentCue->getLabel();
                 if (newLabel.isEmpty()) {
-                    newLabel = QString::number(hotcueNumber + 1);
+                    newLabel = hotcueName;
                 } else {
-                    newLabel = QString("%1: %2").arg(hotcueNumber + 1).arg(newLabel);
+                    newLabel = QString("%1: %2").arg(hotcueName, newLabel);
                 }
 
                 if (pMark->m_text != newLabel) {
@@ -1055,6 +1057,16 @@ void WOverview::drawRangeMarks(QPainter* pPainter, const float& offset, const fl
 }
 
 void WOverview::drawMarks(QPainter* pPainter, const float offset, const float gain) {
+    // Refresh hotcue labels and stacking when a marker style setting changed
+    // (e.g. hotcue letters switched on/off in the preferences).
+    const int markStyleGeneration = WaveformMark::styleGeneration();
+    if (markStyleGeneration != m_markStyleGeneration) {
+        m_markStyleGeneration = markStyleGeneration;
+        if (m_pCurrentTrack) {
+            updateCues(m_pCurrentTrack->getCuePoints());
+        }
+    }
+
     QFont markerFont = pPainter->font();
     markerFont.setPixelSize(static_cast<int>(m_iLabelFontSize * m_scaleFactor));
     QFontMetricsF fontMetrics(markerFont);
@@ -1260,10 +1272,10 @@ void WOverview::drawMarks(QPainter* pPainter, const float offset, const float ga
             }
             pMark->m_label.setAreaRect(hoverArea);
         } else if (!pMark->m_text.isEmpty()) {
-            Qt::Alignment halign = pMark->m_align & Qt::AlignHorizontal_Mask;
-            Qt::Alignment valign = pMark->m_align & Qt::AlignVertical_Mask;
+            Qt::Alignment halign = pMark->labelAlign() & Qt::AlignHorizontal_Mask;
+            Qt::Alignment valign = pMark->labelAlign() & Qt::AlignVertical_Mask;
 
-            QString text = pMark->m_text;
+            QString text = pMark->displayText();
 
             // Only allow the text to overlap the following mark if the mouse is
             // hovering over it. Elide it if it would render over the next
@@ -1290,7 +1302,7 @@ void WOverview::drawMarks(QPainter* pPainter, const float offset, const float ga
             // ellipsis character, so always show at least the hotcue number if
             // the label does not fit.
             if ((text.isEmpty() || text == "…") && pMark->getHotCue() != Cue::kNoHotCue) {
-                text = QString::number(pMark->getHotCue() + 1);
+                text = WaveformMark::hotCueName(pMark->getHotCue());
             }
 
             QRectF textRect = fontMetrics.boundingRect(text);
@@ -1329,12 +1341,14 @@ void WOverview::drawMarks(QPainter* pPainter, const float offset, const float ga
                 }
             }
 
+            // Rekordbox style: cue colored background, black text.
+            const bool rekordboxStyle = pMark->isRekordboxStyleLabel();
             pMark->m_label.prerender(textPoint,
                     QPixmap(),
                     text,
                     markerFont,
-                    m_labelTextColor,
-                    m_labelBackgroundColor,
+                    rekordboxStyle ? QColor(Qt::black) : m_labelTextColor,
+                    rekordboxStyle ? pMark->fillColor() : m_labelBackgroundColor,
                     width(),
                     devicePixelRatioF());
         }
@@ -1354,7 +1368,7 @@ void WOverview::drawMarks(QPainter* pPainter, const float offset, const float ga
         // so if the label is on bottom draw the position text on top and
         // vice versa.
         if (pMark == m_pHoveredMark) {
-            Qt::Alignment valign = pMark->m_align & Qt::AlignVertical_Mask;
+            Qt::Alignment valign = pMark->labelAlign() & Qt::AlignVertical_Mask;
             QPointF positionTextPoint(markPosition + 1.5, 0);
             if (valign == Qt::AlignTop) {
                 positionTextPoint.setY(float(height()) - 0.5f);
