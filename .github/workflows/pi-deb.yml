@@ -1,0 +1,90 @@
+# Builds a Mixxx .deb for the Raspberry Pi 5 (Raspberry Pi OS 64-bit, Debian Trixie)
+# and publishes it as the GitHub release "pi-latest" with a fixed file name, so the Pi
+# can always download it from the same URL:
+#   https://github.com/<owner>/<repo>/releases/download/pi-latest/mixxx-pi5-arm64.deb
+#
+# Start it by hand: Actions tab -> "Raspberry Pi 5 .deb" -> Run workflow (pick the branch).
+name: Raspberry Pi 5 .deb
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: pi-deb
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build .deb (arm64, Debian Trixie)
+    runs-on: ubuntu-24.04-arm # native arm64 runner, free for public repositories
+    container: debian:trixie # same Debian as Raspberry Pi OS Trixie -> matching libraries
+    timeout-minutes: 240
+    permissions:
+      contents: read
+    steps:
+      - name: Enable non-free (for fonts-ubuntu) and install basic tools
+        run: |
+          sed -i 's/^Components: main.*/Components: main contrib non-free non-free-firmware/' \
+            /etc/apt/sources.list.d/debian.sources
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates sudo ninja-build
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Mixxx takes its version number from git
+
+      - name: Install build dependencies
+        run: tools/debian_buildenv.sh setup
+
+      - name: Configure
+        # OPTIMIZE=portable + -mcpu=cortex-a76 instead of OPTIMIZE=native:
+        # "native" would tune for the GitHub runner's CPU, which can use instructions
+        # the Pi 5 doesn't have. cortex-a76 is exactly the Pi 5's CPU.
+        run: |
+          cmake -G Ninja -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DOPTIMIZE=portable \
+            -DCMAKE_C_FLAGS="-mcpu=cortex-a76" \
+            -DCMAKE_CXX_FLAGS="-mcpu=cortex-a76" \
+            -DENGINEPRIME=OFF \
+            -DBUILD_TESTING=OFF \
+            -DBUILD_BENCH=OFF
+
+      - name: Build
+        run: cmake --build build --parallel "$(nproc)"
+
+      - name: Package
+        run: |
+          cd build
+          cpack -G DEB
+          mv ./*.deb mixxx-pi5-arm64.deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mixxx-pi5-deb
+          path: build/mixxx-pi5-arm64.deb
+          retention-days: 14
+
+  release:
+    name: Publish as release "pi-latest"
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # needed to create the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mixxx-pi5-deb
+
+      - name: Replace the "pi-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete pi-latest --cleanup-tag --yes || true
+          gh release create pi-latest mixxx-pi5-arm64.deb \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Mixxx for Raspberry Pi 5 ($GITHUB_REF_NAME, ${GITHUB_SHA::7})" \
+            --notes "Built from \`$GITHUB_REF_NAME\` at $GITHUB_SHA for Raspberry Pi OS 64-bit (Trixie), Raspberry Pi 5 only."
